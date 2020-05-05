@@ -225,8 +225,10 @@ def real_run(args, opt_file_lookup, run_uuid):  # pragma: io
         status = call(full_cmd, shell=False, cwd=args[CmdArgs.optimizer_root])
         ran += 1
         if status != 0:
-            failed += 1
             warnings.warn("status code %d returned from:\n%s" % (status, " ".join(full_cmd)), RuntimeWarning)
+            raise ChildProcessError()
+            # failed += 1
+            # warnings.warn("status code %d returned from:\n%s" % (status, " ".join(full_cmd)), RuntimeWarning)
     logger.info("%d failures of benchmark script after %d studies." % (failed, ran))
 
 
