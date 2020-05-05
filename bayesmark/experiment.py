@@ -70,13 +70,7 @@ def run_study(optimizer, test_problem, n_calls, n_suggestions):
     function_evals = np.zeros((n_calls, n_suggestions))
     for ii in range(n_calls):
         tt = time()
-        try:
-            next_points = optimizer.suggest(n_suggestions)
-        except Exception as e:
-            logger.warning("Failure in optimizer suggest. Falling back to random search.")
-            logger.exception(e, exc_info=True)
-            api_config = test_problem.get_api_config()
-            next_points = rs.suggest_dict([], [], api_config, n_suggestions=n_suggestions)
+        next_points = optimizer.suggest(n_suggestions)
         suggest_time[ii] = time() - tt
 
         logger.info("suggestion time taken %f iter %d next_points %s" % (suggest_time[ii], ii, str(next_points)))
@@ -103,11 +97,7 @@ def run_study(optimizer, test_problem, n_calls, n_suggestions):
         eval_list = function_evals[ii, :].tolist()
 
         tt = time()
-        try:
-            optimizer.observe(next_points, eval_list)
-        except Exception as e:
-            logger.warning("Failure in optimizer observe. Ignoring these observations.")
-            logger.exception(e, exc_info=True)
+        optimizer.observe(next_points, eval_list)
         observe_time[ii] = time() - tt
 
         logger.info(

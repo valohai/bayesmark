@@ -219,15 +219,14 @@ def real_run(args, opt_file_lookup, run_uuid):  # pragma: io
     logger.info("Supply --db %s to append to this experiment or reproduce jobs file." % args[CmdArgs.db])
 
     # Get and run the commands in a sub-process
-    ran, failed = 0, 0
+    counter = 0
     G = gen_commands(args, opt_file_lookup, run_uuid)
     for _, full_cmd in G:
         status = call(full_cmd, shell=False, cwd=args[CmdArgs.optimizer_root])
-        ran += 1
         if status != 0:
-            failed += 1
-            warnings.warn("status code %d returned from:\n%s" % (status, " ".join(full_cmd)), RuntimeWarning)
-    logger.info("%d failures of benchmark script after %d studies." % (failed, ran))
+            raise ChildProcessError("status code %d returned from:\n%s" % (status, " ".join(full_cmd)))
+        counter += 1
+    logger.info(f"Benchmark script ran {counter} studies successfully.")
 
 
 def main():
