@@ -19,11 +19,13 @@ CMD_NAME = "bayesmark"
 # https://packaging.python.org/guides/making-a-pypi-friendly-readme/#validating-restructuredtext-markup
 REMOVE_FROM_RST = (":func:", ":ref:")
 
+
 def read_requirements(name):
     with open("requirements/" + name + ".in") as f:
         requirements = f.read().strip()
     requirements = requirements.replace("==", "~=").splitlines()  # Loosen strict pins
     return [pp for pp in requirements if pp[0].isalnum()]
+
 
 # Derive install requires from base.in first order requirements
 requirements = read_requirements("base")
