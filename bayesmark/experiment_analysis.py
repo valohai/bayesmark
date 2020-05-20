@@ -13,6 +13,7 @@
 # limitations under the License.
 """Perform analysis to compare different optimizers across problems.
 """
+import json
 import logging
 import warnings
 
@@ -217,6 +218,11 @@ def main():
     logger.info("mean score @ %d:\n%s" % (summary.sizes[ITER], xru.da_to_string(final_score)))
     final_score = summary[NORMED_MEAN][{ITER: -1}]
     logger.info("normed mean score @ %d:\n%s" % (summary.sizes[ITER], xru.da_to_string(final_score)))
+
+    # JSON of final scores for tools like Valohai (with extra space because it is important)
+    logger.info(
+        "\nnormed mean score @ %d (JSON):\n%s\n" % (summary.sizes[ITER], json.dumps(final_score.to_series().to_dict()))
+    )
 
     # Now saving results
     meta = {"args": serializable_dict(args), "signature": signatures}
