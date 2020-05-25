@@ -219,7 +219,7 @@ def main():
     final_score = summary[NORMED_MEAN][{ITER: -1}]
     logger.info("normed mean score @ %d:\n%s" % (summary.sizes[ITER], xru.da_to_string(final_score)))
 
-    logger.info(json.dumps(final_score.to_series().to_dict()))
+    print(json.dumps(final_score.to_series().to_dict()))
 
     # Now saving results
     meta = {"args": serializable_dict(args), "signature": signatures}
