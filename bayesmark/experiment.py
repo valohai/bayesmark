@@ -13,7 +13,9 @@
 # limitations under the License.
 """Perform a study.
 """
+import json
 import logging
+import os.path
 import random as pyrandom
 import uuid
 from collections import OrderedDict
@@ -24,10 +26,9 @@ import xarray as xr
 
 import bayesmark.cmd_parse as cmd
 import bayesmark.constants as cc
-import bayesmark.random_search as rs
 from bayesmark.builtin_opt.config import CONFIG
 from bayesmark.cmd_parse import CmdArgs
-from bayesmark.constants import ITER, SUGGEST
+from bayesmark.constants import ITER, SUGGEST, TARGET
 from bayesmark.data import METRICS_LOOKUP, get_problem_type
 from bayesmark.np_util import random_seed
 from bayesmark.serialize import XRSerializer
@@ -68,6 +69,7 @@ def run_study(optimizer, test_problem, n_calls, n_suggestions):
     observe_time = np.zeros(n_calls)
     eval_time = np.zeros((n_calls, n_suggestions))
     function_evals = np.zeros((n_calls, n_suggestions))
+    suggest_log = [None] * n_calls
     for ii in range(n_calls):
         tt = time()
         next_points = optimizer.suggest(n_suggestions)
@@ -86,6 +88,7 @@ def run_study(optimizer, test_problem, n_calls, n_suggestions):
                 f_current_eval = np.inf  # or maybe nan better
             eval_time[ii, jj] = time() - tt
 
+            suggest_log[ii] = next_points
             function_evals[ii, jj] = f_current_eval
             logger.info(
                 "function_evaluation time %f value %f suggestion %s"
@@ -104,7 +107,7 @@ def run_study(optimizer, test_problem, n_calls, n_suggestions):
             "observation time %f, current best %f at iter %d" % (observe_time[ii], np.min(function_evals[: ii + 1]), ii)
         )
 
-    return function_evals, (suggest_time, eval_time, observe_time)
+    return function_evals, (suggest_time, eval_time, observe_time), suggest_log
 
 
 def run_sklearn_study(opt_class, opt_kwargs, model_name, dataset, scorer, n_calls, n_suggestions, data_root=None):
@@ -244,6 +247,22 @@ def build_timing_ds(suggest_time, eval_time, observe_time):
     return time_ds
 
 
+def _dump_suggest_log(f, function_evals, suggest_log):
+    n, p = function_evals.shape
+    for ii in range(n):
+        for jj in range(p):
+            target = function_evals[ii, jj]
+            assert isinstance(target, float)
+            params = suggest_log[ii][jj]
+            assert isinstance(params, dict)
+            assert TARGET not in params
+            params[TARGET] = target
+            data_str = json.dumps(params)
+            assert data_str.splitlines() == [data_str]
+            f.write(data_str)
+            f.write("\n")  # TODO be more system indep
+
+
 def load_optimizer_kwargs(optimizer_name, opt_root):  # pragma: io
     """Load the kwarg options for this optimizer being tested.
 
@@ -351,7 +370,7 @@ def experiment_main(opt_class, args=None):  # pragma: main
         )
     )
     logger.info("with data root: %s" % args[CmdArgs.data_root])
-    function_evals, timing = run_sklearn_study(
+    function_evals, timing, suggest_log = run_sklearn_study(
         opt_class,
         opt_kwargs,
         args[CmdArgs.classifier],
@@ -376,6 +395,14 @@ def experiment_main(opt_class, args=None):  # pragma: main
 
     logger.info("saving timing")
     XRSerializer.save(time_ds, meta, args[CmdArgs.db_root], db=args[CmdArgs.db], key=cc.TIME, uuid_=run_uuid)
+
+    logger.info("saving (append) suggest log")
+    # TODO use arg_delim etc
+    fname = f"{args[CmdArgs.classifier]}_{args[CmdArgs.data]}_{args[CmdArgs.metric]}.json"
+    # TODO use join routine, diff dir
+    path = os.path.join(args[CmdArgs.db_root], args[CmdArgs.db], fname)
+    with open(path, "a") as f:
+        _dump_suggest_log(f, function_evals, suggest_log)
 
     logger.info("done")
 

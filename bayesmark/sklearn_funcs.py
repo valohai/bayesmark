@@ -27,6 +27,8 @@ The kwarg dict is `fixed_param_dict` + `search_param_dict`. The
 `search_param_api_dict`. See the API description for information on setting up
 the `search_param_api_dict`.
 """
+import json
+import pickle as pkl
 import warnings
 from abc import ABC, abstractmethod
 
@@ -41,8 +43,9 @@ from sklearn.svm import SVC, SVR
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.utils import shuffle
 
-from bayesmark.constants import METRICS, MODEL_NAMES
-from bayesmark.data import METRICS_LOOKUP, ProblemType, load_data
+from bayesmark.constants import METRICS, MODEL_NAMES, TARGET
+from bayesmark.data import METRICS_LOOKUP, ProblemType, get_problem_type, load_data
+from bayesmark.space import JointSpace
 
 CV_SPLITS = 3  # 5 probably makes more sense, but will be slower.
 
@@ -330,3 +333,78 @@ class SklearnModel(TestFunction):
         overall_loss = -overall_score
         assert np.isfinite(overall_loss), "loss not even finite"
         return overall_loss
+
+
+class SklearnSurrogate(TestFunction):
+    """Test class for sklearn classifier/regressor CV score objective functions.
+    """
+
+    def __init__(self, model, dataset, pkl_bytes=None, data_str=None):
+        """Build class that wraps sklearn classifier/regressor CV score for use as an objective function.
+
+        Parameters
+        ----------
+        TODO doc update
+        """
+        TestFunction.__init__(self)
+
+        assert (pkl_bytes is None) != (data_str is None), "Cannot supply both model pkl and data, right now."
+
+        # Find the space class
+        problem_type = get_problem_type(dataset)
+        assert problem_type in (ProblemType.clf, ProblemType.reg)
+        _, _, api_config = MODELS_CLF[model] if problem_type == ProblemType.clf else MODELS_REG[model]
+        self.space = JointSpace(api_config)
+
+        if pkl_bytes is not None:
+            assert isinstance(pkl_bytes, bytes)
+            self.model = pkl.loads(pkl_bytes)
+            assert callable(getattr(self.model, "predict", None))
+        else:
+            # TODO apply BO on the hypers!
+            # Will also need to consider standardization if we move away from RF
+            self.model = RandomForestRegressor()
+
+            # Pull out X, y data from JSON logs & validate
+            assert isinstance(data_str, str)
+            X, y = zip(*[self._process_line(self.space, dd) for dd in data_str.splitlines()])
+            X, y = np.asarray(X, dtype=float), np.asarray(y, dtype=float)
+            assert X.ndim == 2
+            assert y.ndim == 1
+            assert X.shape[0] == y.shape[0]
+
+            self.model.fit(X, y)
+
+    def evaluate(self, params):
+        """Evaluate the sklearn CV objective at a particular parameter setting.
+
+        Parameters
+        ----------
+        params : dict(str, object)
+            The varying (non-fixed) parameter dict to the sklearn model.
+
+        Returns
+        -------
+        overall_loss : float
+            Average loss over CV splits for sklearn model when tested using the settings in params.
+        """
+        x = self.space.warp([params])
+        y, = self.model.predict(x)
+        y = y.item()  # unbox to keep simple
+        assert isinstance(y, float)
+        return y
+
+    def dumps(self):
+        # TODO consider also doing pkl of space
+        pkl_bytes = pkl.dumps(self.model)
+        assert isinstance(pkl_bytes, bytes)
+        return pkl_bytes
+
+    @staticmethod
+    def _process_line(space, line):
+        params = json.loads(line)
+        y = params.pop(TARGET)
+        assert isinstance(y, float)
+        x, = space.warp([params])
+        assert x.ndim == 1
+        return x, y

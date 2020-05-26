@@ -19,6 +19,7 @@ RANDOM_SEARCH = "RandomSearch"
 OPTIMIZERS_FILE = "config.json"
 ARG_DELIM = "_"  # Delimeter used when concat cmd argument for any reason
 PY_INTERPRETER = "python"  # What command to call for sub process, we could specify version number here also.
+TARGET = "_target"
 
 # Variables to save in SAL
 EVAL = "eval"
