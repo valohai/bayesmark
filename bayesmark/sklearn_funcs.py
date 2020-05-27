@@ -43,7 +43,7 @@ from sklearn.svm import SVC, SVR
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.utils import shuffle
 
-from bayesmark.constants import METRICS, MODEL_NAMES, TARGET
+from bayesmark.constants import METRICS, MODEL_NAMES
 from bayesmark.data import METRICS_LOOKUP, ProblemType, get_problem_type, load_data
 from bayesmark.space import JointSpace
 
@@ -265,9 +265,6 @@ class SklearnModel(TestFunction):
         data_root : str
             Root directory to look for all custom csv files.
         """
-        # TODO remove
-        assert False
-
         TestFunction.__init__(self)
         data, target, problem_type = load_data(dataset, data_root=data_root)
         assert problem_type in (ProblemType.clf, ProblemType.reg)
@@ -349,6 +346,9 @@ class SklearnSurrogate(TestFunction):
         ----------
         TODO doc update
         """
+        # TODO remove
+        assert False
+
         TestFunction.__init__(self)
 
         assert (pkl_bytes is None) != (data_str is None), "Cannot supply both model pkl and data, right now."
@@ -406,7 +406,7 @@ class SklearnSurrogate(TestFunction):
     @staticmethod
     def _process_line(space, line):
         params = json.loads(line)
-        y = params.pop(TARGET)
+        y = None  # params.pop(TARGET)
         assert isinstance(y, float)
         x, = space.warp([params])
         assert x.ndim == 1
