@@ -265,7 +265,7 @@ def build_suggest_ds(suggest_log):
     for ii in range(n_call):
         for jj in range(n_suggest):
             for kk in ds_vars:
-                data[kk][ii, jj] = suggest_log[ii][jj][kk]
+                data[kk][1][ii, jj] = suggest_log[ii][jj][kk]
 
     suggest_ds = xr.Dataset(data, coords=coords)
     return suggest_ds

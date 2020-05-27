@@ -143,13 +143,16 @@ def concat_experiments(all_experiments, ravel=False):
     """
     all_perf = {}
     all_time = {}
+    all_suggest = {}
     all_sigs = {}
     trial_counter = Counter()
-    for (test_case, optimizer, uuid), (perf_da, time_ds, sig) in all_experiments:
+    for (test_case, optimizer, uuid), (perf_da, time_ds, suggest_ds, sig) in all_experiments:
         if ravel:
+            assert False, "temp. not supported"
             n_suggest = perf_da.sizes[SUGGEST]
             perf_da = _ravel_perf(perf_da)
             time_ds = _ravel_time(time_ds)
+            suggest_ds = _ravel_time(suggest_ds)
             optimizer = str_join_safe(ARG_DELIM, (optimizer, "p%d" % n_suggest), append=True)
 
         case_key = (test_case, optimizer, trial_counter[(test_case, optimizer)])
@@ -161,6 +164,10 @@ def concat_experiments(all_experiments, ravel=False):
 
         # Process time data
         all_time[case_key] = summarize_time(time_ds)
+
+        # Process suggestion data
+        all_suggest_curr = all_suggest.setdefault(test_case, {})
+        all_suggest_curr[case_key] = suggest_ds
 
         # Handle the signatures
         all_sigs.setdefault(test_case, []).append(sig)
@@ -176,7 +183,17 @@ def concat_experiments(all_experiments, ravel=False):
     assert not any(np.any(np.isnan(all_time[kk].values)) for kk in all_time)
     assert xru.coord_compat((all_perf, all_time), (ITER, TEST_CASE, METHOD, TRIAL))
 
-    return all_perf, all_time, all_sigs
+    for test_case in all_suggest:
+        all_suggest[test_case] = xru.ds_concat(all_suggest[test_case], dims=(TEST_CASE, METHOD, TRIAL))
+        assert all(
+            all_suggest[test_case][kk].dims == (ITER, SUGGEST, TEST_CASE, METHOD, TRIAL)
+            for kk in all_suggest[test_case]
+        )
+        assert not any(np.any(np.isnan(all_suggest[test_case][kk].values)) for kk in all_suggest[test_case])
+        assert xru.coord_compat((all_perf, all_suggest[test_case]), (ITER, METHOD, TRIAL))
+        assert all_suggest[test_case].coords[TEST_CASE].shape == (1,), "test case should be singleton"
+
+    return all_perf, all_time, all_suggest, all_sigs
 
 
 def load_experiments(uuid_list, db_root, dbid):  # pragma: io
@@ -211,6 +228,8 @@ def load_experiments(uuid_list, db_root, dbid):  # pragma: io
         perf_da = xru.only_dataarray(perf_da)
         time_ds, meta_t = XRSerializer.load(db_root, db=dbid, key=cc.TIME, uuid_=uuid_)
         assert meta == meta_t, "meta data should between time and eval files"
+        suggest_ds, meta_t = XRSerializer.load(db_root, db=dbid, key=cc.SUGGEST_LOG, uuid_=uuid_)
+        assert meta == meta_t, "meta data should between time and eval files"
 
         # Get signature to pass out as well
         _, sig = meta["signature"]
@@ -235,7 +254,7 @@ def load_experiments(uuid_list, db_root, dbid):  # pragma: io
 
         # Return key -> data so this generator can be iterated over in dict like manner
         meta_data = (test_case, optimizer, args_uuid)
-        data = (perf_da, time_ds, sig)
+        data = (perf_da, time_ds, suggest_ds, sig)
         yield meta_data, data
 
 
@@ -249,14 +268,16 @@ def main():
     if args[CmdArgs.verbose]:
         logger.addHandler(logging.StreamHandler())
 
-    # Always sort after listdir
+    # Get list of UUIDs
     uuid_list = XRSerializer.get_uuids(args[CmdArgs.db_root], db=args[CmdArgs.db], key=cc.EVAL)
     uuid_list_ = XRSerializer.get_uuids(args[CmdArgs.db_root], db=args[CmdArgs.db], key=cc.TIME)
     assert uuid_list == uuid_list_, "UUID list does not match between time and eval results"
+    uuid_list_ = XRSerializer.get_uuids(args[CmdArgs.db_root], db=args[CmdArgs.db], key=cc.SUGGEST_LOG)
+    assert uuid_list == uuid_list_, "UUID list does not match between suggest log and eval results"
 
     # Get iterator of all experiment data dumps, load in and process, and concat
     data_G = load_experiments(uuid_list, args[CmdArgs.db_root], args[CmdArgs.db])
-    all_perf, all_time, all_sigs = concat_experiments(data_G, ravel=args[CmdArgs.ravel])
+    all_perf, all_time, all_suggest, all_sigs = concat_experiments(data_G, ravel=args[CmdArgs.ravel])
 
     # Check the concat signatures make are coherent
     sig_errs, signatures_median = analyze_signatures(all_sigs)
@@ -268,6 +289,8 @@ def main():
     all_perf = all_perf.to_dataset(name="results")
     XRSerializer.save_derived(all_perf, meta, args[CmdArgs.db_root], db=args[CmdArgs.db], key=EVAL_RESULTS)
     XRSerializer.save_derived(all_time, meta, args[CmdArgs.db_root], db=args[CmdArgs.db], key=TIME_RESULTS)
+    for test_case, ds in all_suggest.items():
+        XRSerializer.save_derived(ds, meta, args[CmdArgs.db_root], db=args[CmdArgs.db], key=test_case)
 
     logger.info("done")
 
