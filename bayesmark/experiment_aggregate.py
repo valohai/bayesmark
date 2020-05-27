@@ -148,6 +148,7 @@ def concat_experiments(all_experiments, ravel=False):
     trial_counter = Counter()
     for (test_case, optimizer, uuid), (perf_da, time_ds, suggest_ds, sig) in all_experiments:
         if ravel:
+            # TODO ravel suggest log too
             assert False, "temp. not supported"
             n_suggest = perf_da.sizes[SUGGEST]
             perf_da = _ravel_perf(perf_da)

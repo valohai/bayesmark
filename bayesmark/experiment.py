@@ -31,13 +31,18 @@ from bayesmark.data import METRICS_LOOKUP, get_problem_type
 from bayesmark.np_util import random_seed
 from bayesmark.serialize import XRSerializer
 from bayesmark.signatures import get_func_signature
-from bayesmark.sklearn_funcs import SklearnModel
+from bayesmark.sklearn_funcs import SklearnModel, SklearnSurrogate
+from bayesmark.util import chomp
 
 logger = logging.getLogger(__name__)
 
 
-def _build_test_problem(model_name, dataset, scorer, logging_path):
-    prob = SklearnModel(model_name, dataset, scorer, data_root=logging_path)
+def _build_test_problem(model_name, dataset, scorer, path):
+    if scorer.endswith("-surr"):
+        scorer = chomp(scorer, "-surr")
+        prob = SklearnSurrogate(model_name, dataset, scorer, model_path=path)
+    else:
+        prob = SklearnModel(model_name, dataset, scorer, data_root=path)
     return prob
 
 
@@ -150,7 +155,6 @@ def run_sklearn_study(opt_class, opt_kwargs, model_name, dataset, scorer, n_call
         evaluation of the objective function, and the time to make an observe call.
     """
     # Setup test function
-    # TODO put in builder: function_instance = SklearnModel(model_name, dataset, scorer, data_root=data_root)
     function_instance = _build_test_problem(model_name, dataset, scorer, data_root)
 
     # Setup optimizer
@@ -185,7 +189,6 @@ def get_objective_signature(model_name, dataset, scorer, data_root=None):
     signature : list(str)
         The signature of this test function.
     """
-    # TODO put in builder: function_instance = SklearnModel(model_name, dataset, scorer, data_root=data_root)
     function_instance = _build_test_problem(model_name, dataset, scorer, data_root)
     api_config = function_instance.get_api_config()
     signature = get_func_signature(function_instance.evaluate, api_config)
