@@ -60,7 +60,7 @@ setup(
             CMD_NAME + "-baseline = bayesmark.experiment_baseline:main",
             CMD_NAME + "-anal = bayesmark.experiment_analysis:main",
             CMD_NAME + "-exp = bayesmark.experiment:main",
-            CMD_NAME + "-surr = experiment_surrogates:main",
+            CMD_NAME + "-surr = bayesmark.experiment_surrogates:main",
         ]
     },
 )
