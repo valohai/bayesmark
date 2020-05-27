@@ -33,9 +33,21 @@ from bayesmark.data import METRICS_LOOKUP, get_problem_type
 from bayesmark.np_util import random_seed
 from bayesmark.serialize import XRSerializer
 from bayesmark.signatures import get_func_signature
-from bayesmark.sklearn_funcs import SklearnModel
+from bayesmark.sklearn_funcs import SklearnModel, SklearnSurrogate
 
 logger = logging.getLogger(__name__)
+
+
+def _build_test_problem(model_name, dataset, scorer, logging_path):
+    # TODO try to load pre-trained with pkl, but use json and train if fail?
+    # or only do skl and require pkl to be built offline??
+    fname = f"{model_name}_{dataset}_{scorer}.json"
+    # TODO use join routine, diff dir
+    path = os.path.join(logging_path, fname)
+    with open(path, "r") as f:
+        data_str = f.read()
+    prob = SklearnSurrogate(model_name, dataset, data_str=data_str)
+    return prob
 
 
 def run_study(optimizer, test_problem, n_calls, n_suggestions):
@@ -147,7 +159,8 @@ def run_sklearn_study(opt_class, opt_kwargs, model_name, dataset, scorer, n_call
         evaluation of the objective function, and the time to make an observe call.
     """
     # Setup test function
-    function_instance = SklearnModel(model_name, dataset, scorer, data_root=data_root)
+    # TODO put in builder: function_instance = SklearnModel(model_name, dataset, scorer, data_root=data_root)
+    function_instance = _build_test_problem(model_name, dataset, scorer, data_root)
 
     # Setup optimizer
     api_config = function_instance.get_api_config()
@@ -181,7 +194,8 @@ def get_objective_signature(model_name, dataset, scorer, data_root=None):
     signature : list(str)
         The signature of this test function.
     """
-    function_instance = SklearnModel(model_name, dataset, scorer, data_root=data_root)
+    # TODO put in builder: function_instance = SklearnModel(model_name, dataset, scorer, data_root=data_root)
+    function_instance = _build_test_problem(model_name, dataset, scorer, data_root)
     api_config = function_instance.get_api_config()
     signature = get_func_signature(function_instance.evaluate, api_config)
     return signature
@@ -320,6 +334,9 @@ def experiment_main(opt_class, args=None):  # pragma: main
         args = cmd.parse_args(cmd.experiment_parser(description))
     args[CmdArgs.opt_rev] = opt_class.get_version()
 
+    # TODO otherwise use csv dir
+    data_root = os.path.join(args[CmdArgs.db_root], args[CmdArgs.db])
+
     run_uuid = uuid.UUID(args[CmdArgs.uuid])
 
     logging.captureWarnings(True)
@@ -348,7 +365,7 @@ def experiment_main(opt_class, args=None):  # pragma: main
     # across all runs to ensure signature is consistent. This seed is random:
     _setup_seeds("7e9f2cabb0dd4f44bc10cf18e440b427")  # pragma: allowlist secret
     signature = get_objective_signature(
-        args[CmdArgs.classifier], args[CmdArgs.data], args[CmdArgs.metric], data_root=args[CmdArgs.data_root]
+        args[CmdArgs.classifier], args[CmdArgs.data], args[CmdArgs.metric], data_root=data_root
     )
     logger.info("computed signature: %s" % str(signature))
 
@@ -378,7 +395,7 @@ def experiment_main(opt_class, args=None):  # pragma: main
         args[CmdArgs.metric],
         args[CmdArgs.n_calls],
         args[CmdArgs.n_suggest],
-        data_root=args[CmdArgs.data_root],
+        data_root=data_root,
     )
 
     # Curate results into clean dataframes
@@ -397,10 +414,12 @@ def experiment_main(opt_class, args=None):  # pragma: main
     XRSerializer.save(time_ds, meta, args[CmdArgs.db_root], db=args[CmdArgs.db], key=cc.TIME, uuid_=run_uuid)
 
     logger.info("saving (append) suggest log")
+    # Could use XRSerializer later, but for now that makes it too complicated for simple append operation
     # TODO use arg_delim etc
     fname = f"{args[CmdArgs.classifier]}_{args[CmdArgs.data]}_{args[CmdArgs.metric]}.json"
     # TODO use join routine, diff dir
     path = os.path.join(args[CmdArgs.db_root], args[CmdArgs.db], fname)
+    # TODO put in signature at top of file, make sure it matches
     with open(path, "a") as f:
         _dump_suggest_log(f, function_evals, suggest_log)
 

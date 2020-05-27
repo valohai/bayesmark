@@ -265,6 +265,9 @@ class SklearnModel(TestFunction):
         data_root : str
             Root directory to look for all custom csv files.
         """
+        # TODO remove
+        assert False
+
         TestFunction.__init__(self)
         data, target, problem_type = load_data(dataset, data_root=data_root)
         assert problem_type in (ProblemType.clf, ProblemType.reg)
@@ -353,8 +356,8 @@ class SklearnSurrogate(TestFunction):
         # Find the space class
         problem_type = get_problem_type(dataset)
         assert problem_type in (ProblemType.clf, ProblemType.reg)
-        _, _, api_config = MODELS_CLF[model] if problem_type == ProblemType.clf else MODELS_REG[model]
-        self.space = JointSpace(api_config)
+        _, _, self.api_config = MODELS_CLF[model] if problem_type == ProblemType.clf else MODELS_REG[model]
+        self.space = JointSpace(self.api_config)
 
         if pkl_bytes is not None:
             assert isinstance(pkl_bytes, bytes)
