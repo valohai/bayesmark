@@ -261,6 +261,25 @@ def build_timing_ds(suggest_time, eval_time, observe_time):
     return time_ds
 
 
+def build_suggest_ds(suggest_log):
+    n_call, n_suggest = np.shape(suggest_log)
+    assert n_call * n_suggest > 0
+
+    # Setup the dims
+    ds_vars = sorted(suggest_log[0][0].keys())
+    coords = OrderedDict([(ITER, range(n_call)), (SUGGEST, range(n_suggest))])
+
+    # There is prob a way to vectorize this more but good enough for now. Using np.full to infer dtype from 1st element
+    data = OrderedDict([(kk, ((ITER, SUGGEST), np.full((n_call, n_suggest), suggest_log[0][0][kk]))) for kk in ds_vars])
+    for ii in range(n_call):
+        for jj in range(n_suggest):
+            for kk in ds_vars:
+                data[kk][ii, jj] = suggest_log[ii][jj][kk]
+
+    suggest_ds = xr.Dataset(data, coords=coords)
+    return suggest_ds
+
+
 def _dump_suggest_log(f, function_evals, suggest_log):
     n, p = function_evals.shape
     for ii in range(n):
@@ -401,6 +420,7 @@ def experiment_main(opt_class, args=None):  # pragma: main
     # Curate results into clean dataframes
     eval_ds = build_eval_ds(function_evals)
     time_ds = build_timing_ds(*timing)
+    suggest_ds = build_suggest_ds(suggest_log)
 
     # setup meta:
     meta = {"args": cmd.serializable_dict(args), "signature": signature}
@@ -413,15 +433,8 @@ def experiment_main(opt_class, args=None):  # pragma: main
     logger.info("saving timing")
     XRSerializer.save(time_ds, meta, args[CmdArgs.db_root], db=args[CmdArgs.db], key=cc.TIME, uuid_=run_uuid)
 
-    logger.info("saving (append) suggest log")
-    # Could use XRSerializer later, but for now that makes it too complicated for simple append operation
-    # TODO use arg_delim etc
-    fname = f"{args[CmdArgs.classifier]}_{args[CmdArgs.data]}_{args[CmdArgs.metric]}.json"
-    # TODO use join routine, diff dir
-    path = os.path.join(args[CmdArgs.db_root], args[CmdArgs.db], fname)
-    # TODO put in signature at top of file, make sure it matches
-    with open(path, "a") as f:
-        _dump_suggest_log(f, function_evals, suggest_log)
+    logger.info("saving suggest log")
+    XRSerializer.save(suggest_ds, meta, args[CmdArgs.db_root], db=args[CmdArgs.db], key=cc.SUGGEST_LOG, uuid_=run_uuid)
 
     logger.info("done")
 
