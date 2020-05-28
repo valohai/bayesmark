@@ -209,7 +209,7 @@ def launcher_parser(description):
 
     add_argument(parser, CmdArgs.optimizer, type=joinable, nargs="+", help="optimizers to use")
     add_argument(parser, CmdArgs.data, type=joinable, nargs="+", help="data sets to use")
-    add_argument(parser, CmdArgs.classifier, type=str, choices=MODEL_NAMES, nargs="+", help="classifiers to use")
+    add_argument(parser, CmdArgs.classifier, type=joinable, nargs="+", help="classifiers to use")
     add_argument(parser, CmdArgs.metric, type=str, choices=METRICS, nargs="+", help="scoring metric to use")
 
     # Iterations counts used in experiments
@@ -244,7 +244,7 @@ def experiment_parser(description):
     add_argument(parser, CmdArgs.db, type=filename, required=True, help="database ID of this benchmark experiment")
     add_argument(parser, CmdArgs.optimizer, required=True, type=joinable, help="optimizer to use")
     add_argument(parser, CmdArgs.data, required=True, type=joinable, help="data set to use")
-    add_argument(parser, CmdArgs.classifier, required=True, type=str, choices=MODEL_NAMES, help="classifier to use")
+    add_argument(parser, CmdArgs.classifier, required=True, type=joinable, help="classifier to use")
     add_argument(parser, CmdArgs.metric, required=True, type=str, choices=METRICS, help="scoring metric to use")
 
     add_argument(parser, CmdArgs.n_calls, default=100, type=positive_int, help="number of function evaluations")

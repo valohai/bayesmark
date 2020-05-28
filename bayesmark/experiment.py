@@ -38,9 +38,9 @@ logger = logging.getLogger(__name__)
 
 
 def _build_test_problem(model_name, dataset, scorer, path):
-    if scorer.endswith("-surr"):
-        scorer = chomp(scorer, "-surr")
-        prob = SklearnSurrogate(model_name, dataset, scorer, model_path=path)
+    if model_name.endswith("-surr"):
+        model_name = chomp(model_name, "-surr")
+        prob = SklearnSurrogate(model_name, dataset, scorer, path=path)
     else:
         prob = SklearnModel(model_name, dataset, scorer, data_root=path)
     return prob
