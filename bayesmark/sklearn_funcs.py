@@ -335,6 +335,11 @@ class SklearnModel(TestFunction):
         assert np.isfinite(overall_loss), "loss not even finite"
         return overall_loss
 
+        @staticmethod
+        def test_case_str(model, dataset, scorer):
+            test_case = str_join_safe(ARG_DELIM, (model, dataset, scorer))
+            return test_case
+
 
 class SklearnSurrogate(TestFunction):
     """Test class for sklearn classifier/regressor CV score objective functions.
@@ -356,8 +361,7 @@ class SklearnSurrogate(TestFunction):
         self.space = JointSpace(self.api_config)
 
         # Load the pre-trained model
-        # TODO pull out test_case func
-        fname = str_join_safe(ARG_DELIM, (model, dataset, scorer)) + ".pkl"
+        fname = SklearnModel.test_case_str(model, dataset, scorer) + ".pkl"
         path = os.path.join(path, fname)
         with open(path, "rb") as f:
             self.model = pkl.load(f)

@@ -11,7 +11,6 @@ import bayesmark.cmd_parse as cmd
 import bayesmark.xr_util as xru
 from bayesmark.cmd_parse import CmdArgs
 from bayesmark.constants import (
-    ARG_DELIM,
     DATA_LOADER_NAMES,
     EVAL_RESULTS,
     ITER,
@@ -24,9 +23,9 @@ from bayesmark.constants import (
 )
 from bayesmark.data import METRICS_LOOKUP, ProblemType, get_problem_type
 from bayesmark.serialize import XRSerializer
-from bayesmark.sklearn_funcs import MODELS_CLF, MODELS_REG
+from bayesmark.sklearn_funcs import MODELS_CLF, MODELS_REG, SklearnModel
 from bayesmark.space import JointSpace
-from bayesmark.util import str_join_safe, strict_sorted
+from bayesmark.util import strict_sorted
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +98,7 @@ def main():  # pragma: main
         space = JointSpace(api_config)
         for metric in m_lookup[problem_type]:
             # Build name of test case
-            test_case = str_join_safe(ARG_DELIM, (model, data, metric))
+            test_case = SklearnModel.test_case_str(model, data, metric)
 
             # Load in the suggestions
             suggest_ds, meta_t = XRSerializer.load_derived(args[CmdArgs.db_root], db=args[CmdArgs.db], key=test_case)

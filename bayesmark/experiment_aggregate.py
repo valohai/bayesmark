@@ -26,6 +26,7 @@ from bayesmark.constants import ARG_DELIM, EVAL_RESULTS, ITER, METHOD, SUGGEST, 
 from bayesmark.experiment import build_eval_ds, build_timing_ds
 from bayesmark.serialize import XRSerializer
 from bayesmark.signatures import analyze_signatures
+from bayesmark.sklearn_funcs import SklearnModel
 from bayesmark.util import str_join_safe
 
 logger = logging.getLogger(__name__)
@@ -239,8 +240,8 @@ def load_experiments(uuid_list, db_root, dbid):  # pragma: io
 
         # Build the new indices for combined data, this could be put in function for easier testing
         eval_args = unserializable_dict(meta["args"])  # Unpack meta-data
-        test_case = str_join_safe(
-            ARG_DELIM, (eval_args[CmdArgs.classifier], eval_args[CmdArgs.data], eval_args[CmdArgs.metric])
+        test_case = SklearnModel.test_case_str(
+            eval_args[CmdArgs.classifier], eval_args[CmdArgs.data], eval_args[CmdArgs.metric]
         )
         optimizer = str_join_safe(
             ARG_DELIM, (eval_args[CmdArgs.optimizer], eval_args[CmdArgs.opt_rev], eval_args[CmdArgs.rev])
