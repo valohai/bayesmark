@@ -3,12 +3,25 @@ import os.path
 import pickle as pkl
 from itertools import product
 
+import numpy as np
+import xarray as xr
 from sklearn.ensemble import RandomForestRegressor
 
 import bayesmark.cmd_parse as cmd
 import bayesmark.xr_util as xru
 from bayesmark.cmd_parse import CmdArgs
-from bayesmark.constants import ARG_DELIM, DATA_LOADER_NAMES, EVAL_RESULTS, METRICS, MODEL_NAMES, TEST_CASE
+from bayesmark.constants import (
+    ARG_DELIM,
+    DATA_LOADER_NAMES,
+    EVAL_RESULTS,
+    ITER,
+    METHOD,
+    METRICS,
+    MODEL_NAMES,
+    SUGGEST,
+    TEST_CASE,
+    TRIAL,
+)
 from bayesmark.data import METRICS_LOOKUP, ProblemType, get_problem_type
 from bayesmark.serialize import XRSerializer
 from bayesmark.sklearn_funcs import MODELS_CLF, MODELS_REG
@@ -40,6 +53,10 @@ def main():  # pragma: main
     all_perf, meta = XRSerializer.load_derived(args[CmdArgs.db_root], db=args[CmdArgs.db], key=EVAL_RESULTS)
     logger.info("Meta data from source file: %s" % str(meta["args"]))
     all_perf = xru.only_dataarray(all_perf)
+    assert isinstance(all_perf, xr.DataArray)
+    assert all_perf.dims == (ITER, SUGGEST, TEST_CASE, METHOD, TRIAL)
+    assert xru.is_simple_coords(all_perf.coords, dims=(ITER, SUGGEST, TRIAL))
+    assert not np.any(np.isnan(all_perf.values))
 
     for model, data in product(c_list, d_list):
         problem_type = get_problem_type(data)
@@ -49,9 +66,11 @@ def main():  # pragma: main
             test_case = str_join_safe(ARG_DELIM, (model, data, metric))
 
             # Load in the suggestions
-            suggest_ds, meta = XRSerializer.load_derived(args[CmdArgs.db_root], db=args[CmdArgs.db], key=test_case)
+            suggest_ds, meta_t = XRSerializer.load_derived(args[CmdArgs.db_root], db=args[CmdArgs.db], key=test_case)
             logger.info("Meta data from source file: %s" % str(meta["args"]))
-            # TODO validate/cross check meta data
+
+            # Validate/cross check meta data
+            assert meta == meta_t, "meta data should between suggest and eval files"
 
             # TODO pull out all non-IO parts to routine
 
@@ -67,14 +86,26 @@ def main():  # pragma: main
             suggest_data = {}
             y = perf_curr.values
             for kk in suggest_ds:
-                # TODO validate/Check coord compat
+                suggest_da = suggest_ds[kk]
+                assert isinstance(suggest_da, xr.DataArray)
+                assert suggest_da.dims == (ITER, SUGGEST, TEST_CASE, METHOD, TRIAL)
+                assert xru.is_simple_coords(suggest_da.coords, dims=(ITER, SUGGEST, TRIAL))
+                assert not np.any(np.isnan(suggest_da.values))
+                assert suggest_da.coords[TEST_CASE].shape == (1,), "test case should be singleton"
+                assert xru.coord_compat((perf_curr, suggest_da), (ITER, SUGGEST, TEST_CASE, METHOD, TRIAL))
+
                 X = suggest_ds[kk].values
                 assert X.shape == y.shape
                 suggest_data[kk] = X.ravel(order="C")
             y = y.ravel(order="C")
             X = [{param: suggest_data[param][ii].item() for param in space.param_list} for ii in range(len(y))]
             X = space.warp(X)  # Use space class to get cartesian
-            # TODO more validation on x,y
+
+            # More validation on x,y
+            assert X.ndim == 2
+            assert y.shape == (X.shape[0],)
+            assert not np.any(np.isnan(X))
+            assert not np.any(np.isnan(y))
 
             # Train an surrogate model
             # TODO apply BO on the hypers!

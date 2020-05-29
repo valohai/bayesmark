@@ -230,7 +230,7 @@ def load_experiments(uuid_list, db_root, dbid):  # pragma: io
         time_ds, meta_t = XRSerializer.load(db_root, db=dbid, key=cc.TIME, uuid_=uuid_)
         assert meta == meta_t, "meta data should between time and eval files"
         suggest_ds, meta_t = XRSerializer.load(db_root, db=dbid, key=cc.SUGGEST_LOG, uuid_=uuid_)
-        assert meta == meta_t, "meta data should between time and eval files"
+        assert meta == meta_t, "meta data should between suggest and eval files"
 
         # Get signature to pass out as well
         _, sig = meta["signature"]
