@@ -88,10 +88,9 @@ def main():  # pragma: main
             for kk in suggest_ds:
                 suggest_da = suggest_ds[kk]
                 assert isinstance(suggest_da, xr.DataArray)
-                assert suggest_da.dims == (ITER, SUGGEST, TEST_CASE, METHOD, TRIAL)
+                assert suggest_da.dims == (ITER, SUGGEST, METHOD, TRIAL)
                 assert xru.is_simple_coords(suggest_da.coords, dims=(ITER, SUGGEST, TRIAL))
                 assert not np.any(np.isnan(suggest_da.values))
-                assert suggest_da.coords[TEST_CASE].shape == (1,), "test case should be singleton"
                 assert xru.coord_compat((perf_curr, suggest_da), (ITER, SUGGEST, TEST_CASE, METHOD, TRIAL))
 
                 X = suggest_ds[kk].values
