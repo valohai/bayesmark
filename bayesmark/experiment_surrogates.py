@@ -101,6 +101,7 @@ def main():  # pragma: main
             test_case = SklearnModel.test_case_str(model, data, metric)
 
             # Load in the suggestions
+            print(test_case)
             suggest_ds, meta_t = XRSerializer.load_derived(args[CmdArgs.db_root], db=args[CmdArgs.db], key=test_case)
             logger.info("Meta data from source file: %s" % str(meta["args"]))
 

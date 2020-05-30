@@ -335,10 +335,10 @@ class SklearnModel(TestFunction):
         assert np.isfinite(overall_loss), "loss not even finite"
         return overall_loss
 
-        @staticmethod
-        def test_case_str(model, dataset, scorer):
-            test_case = str_join_safe(ARG_DELIM, (model, dataset, scorer))
-            return test_case
+    @staticmethod
+    def test_case_str(model, dataset, scorer):
+        test_case = str_join_safe(ARG_DELIM, (model, dataset, scorer))
+        return test_case
 
 
 class SklearnSurrogate(TestFunction):
