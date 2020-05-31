@@ -337,20 +337,19 @@ class SklearnModel(TestFunction):
 
     @staticmethod
     def test_case_str(model, dataset, scorer):
+        # TODO doc str
         test_case = str_join_safe(ARG_DELIM, (model, dataset, scorer))
         return test_case
 
 
 class SklearnSurrogate(TestFunction):
     """Test class for sklearn classifier/regressor CV score objective functions.
+
+    # TODO doc str
     """
 
     def __init__(self, model, dataset, scorer, path):
         """Build class that wraps sklearn classifier/regressor CV score for use as an objective function.
-
-        Parameters
-        ----------
-        TODO doc update
         """
         TestFunction.__init__(self)
 

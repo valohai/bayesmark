@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 def _build_test_problem(model_name, dataset, scorer, path):
+    # TODO doc str
     if model_name.endswith("-surr"):
         model_name = chomp(model_name, "-surr")
         prob = SklearnSurrogate(model_name, dataset, scorer, path=path)
@@ -70,6 +71,8 @@ def run_study(optimizer, test_problem, n_calls, n_suggestions):
         Tuple of 3 timing results: ``(suggest_time, eval_time, observe_time)`` with shapes ``(n_calls,)``,
         ``(n_calls, n_suggestions)``, and ``(n_calls,)``. These are the time to make each suggestion, the time for each
         evaluation of the objective function, and the time to make an observe call.
+    suggest_log : list(list(dict(str, object)))
+        Log of the suggestions corresponding to the `function_evals`.
     """
     assert n_suggestions >= 1, "batch size must be at least 1"
 
@@ -153,6 +156,8 @@ def run_sklearn_study(opt_class, opt_kwargs, model_name, dataset, scorer, n_call
         Tuple of 3 timing results: ``(suggest_time, eval_time, observe_time)`` with shapes ``(n_calls,)``,
         ``(n_calls, n_suggestions)``, and ``(n_calls,)``. These are the time to make each suggestion, the time for each
         evaluation of the objective function, and the time to make an observe call.
+    suggest_log : list(list(dict(str, object)))
+        Log of the suggestions corresponding to the `function_evals`.
     """
     # Setup test function
     function_instance = _build_test_problem(model_name, dataset, scorer, data_root)
@@ -256,6 +261,7 @@ def build_timing_ds(suggest_time, eval_time, observe_time):
 
 
 def build_suggest_ds(suggest_log):
+    # TODO doc str
     n_call, n_suggest = np.shape(suggest_log)
     assert n_call * n_suggest > 0
 

@@ -29,6 +29,8 @@ from bayesmark.util import strict_sorted
 
 logger = logging.getLogger(__name__)
 
+# TODO doc str in all funcs here
+
 
 def build_surrogate(suggest_ds, perf_da, space):
     # Get out numeric np data from xr logs

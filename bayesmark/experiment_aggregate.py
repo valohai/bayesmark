@@ -14,6 +14,7 @@
 """Aggregate the results of many studies to prepare analysis.
 """
 import logging
+import warnings
 from collections import Counter
 
 import numpy as np
@@ -141,6 +142,7 @@ def concat_experiments(all_experiments, ravel=False):
         ``(ITER, TEST_CASE, METHOD, TRIAL)``. It has the same variables as `time_ds`.
     all_sigs : dict(str, list(list(float)))
         Aggregate of all experiment signatures.
+    # TODO doc str update
     """
     all_perf = {}
     all_time = {}
@@ -149,8 +151,7 @@ def concat_experiments(all_experiments, ravel=False):
     trial_counter = Counter()
     for (test_case, optimizer, uuid), (perf_da, time_ds, suggest_ds, sig) in all_experiments:
         if ravel:
-            # TODO ravel suggest log too
-            assert False, "temp. not supported"
+            warnings.warn("Suggestion log does not get raveled with time and evals.")
             n_suggest = perf_da.sizes[SUGGEST]
             perf_da = _ravel_perf(perf_da)
             time_ds = _ravel_time(time_ds)
@@ -220,6 +221,7 @@ def load_experiments(uuid_list, db_root, dbid):  # pragma: io
         `time_ds` is an :class:`xarray:xarray.Dataset` containing the timing results of the form accepted by
         `summarize_time`. The coordinates must be compatible with `perf_da`. Finally, `sig` contains the `test_case`
         signature and must be `list(float)`.
+    # TODO doc str update
     """
     uuids_seen = set()
     for uuid_ in uuid_list:
