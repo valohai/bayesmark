@@ -13,13 +13,15 @@
 # limitations under the License.
 """Launch studies in separate studies or do dry run to build jobs file with lists of commands to run.
 """
+import csv
 import json
 import logging
+import multiprocessing
 import random as pyrandom
+import subprocess
 import uuid as pyuuid
 import warnings
 from itertools import product
-from subprocess import TimeoutExpired, call
 
 import numpy as np
 
@@ -91,7 +93,7 @@ def gen_commands(args, opt_file_lookup, run_uuid):
     # Possibilities to iterate over. Put them in sorted order just for good measure.
     c_list = strict_sorted(MODEL_NAMES if args[CmdArgs.classifier] is None else args[CmdArgs.classifier])
     d_list = strict_sorted(DATA_LOADER_NAMES if args[CmdArgs.data] is None else args[CmdArgs.data])
-    o_list = strict_sorted(
+    o_list = sorted(
         list(opt_file_lookup.keys()) + list(CONFIG.keys())
         if args[CmdArgs.optimizer] is None
         else args[CmdArgs.optimizer]
@@ -143,7 +145,7 @@ def gen_commands(args, opt_file_lookup, run_uuid):
             assert all((_is_arg_safe(ss) == (ii % 2 == 1)) for ii, ss in enumerate(cmd_args))
 
             full_cmd = experiment_cmd + cmd_args
-            yield iteration_key, full_cmd
+            yield iteration_key, full_cmd, classifier, data
 
 
 def dry_run(args, opt_file_lookup, run_uuid, fp, random=np_random):
@@ -204,8 +206,6 @@ def dry_run(args, opt_file_lookup, run_uuid, fp, random=np_random):
 def real_run(args, opt_file_lookup, run_uuid, timeout=None):  # pragma: io
     """Run sequence of independent experiments to fully run the benchmark.
 
-    This uses `subprocess` to launch a separate process (in serial) for each experiment.
-
     Parameters
     ----------
     args : dict(CmdArgs, [int, str])
@@ -222,20 +222,54 @@ def real_run(args, opt_file_lookup, run_uuid, timeout=None):  # pragma: io
     args[CmdArgs.db] = XRSerializer.init_db(args[CmdArgs.db_root], db=args[CmdArgs.db], keys=EXP_VARS, exist_ok=True)
     logger.info("Supply --db %s to append to this experiment or reproduce jobs file." % args[CmdArgs.db])
 
-    # Get and run the commands in a sub-process
-    counter = 0
+    models = {}
     G = gen_commands(args, opt_file_lookup, run_uuid)
-    for _, full_cmd in G:
-        try:
-            status = call(full_cmd, shell=False, cwd=args[CmdArgs.optimizer_root], timeout=timeout)
-            if status != 0:
-                raise ChildProcessError("status code %d returned from:\n%s" % (status, " ".join(full_cmd)))
-        except TimeoutExpired:
-            logger.info(f"Experiment timeout after {timeout} seconds.")
-            print(json.dumps({"experiment_timeout_exception": " ".join(full_cmd)}))
+    for _, full_cmd, model, dataset in G:
+        if model not in models:
+            models[model] = {}
+        if dataset not in models[model]:
+            models[model][dataset] = {"commands": []}
 
-        counter += 1
-    logger.info(f"Benchmark script ran {counter} studies successfully.")
+        models[model][dataset]['commands'].append({"cmd": ' '.join(full_cmd), "model": model, "dataset": dataset, "cwd": args[CmdArgs.optimizer_root]})
+
+    for model, datasets in models.items():
+        for dataset, value in datasets.items():
+            commands = value['commands']
+            from timeit import default_timer as timer
+            start = timer()
+            with multiprocessing.Pool() as p:
+                for result in p.imap_unordered(run_command, commands):
+                    pass
+            end = timer()
+            duration = end - start
+            repeats = len(commands)
+            print({
+                "model": model,
+                "dataset": dataset,
+                "repeats": repeats,
+                "time": duration/repeats,
+            })
+            value['duration'] = duration
+
+    with open('output.csv', 'w', newline='') as csvfile:
+        output = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        row = ['model']
+        for model, datasets in models.items():
+            for dataset, value in datasets.items():
+                if dataset not in row:
+                    row.append(dataset)
+        output.writerow(row)
+        for model, datasets in models.items():
+            row = [model]
+            for dataset, value in datasets.items():
+                repeats = len(value['commands'])
+                duration = value['duration']
+                row.append(duration/repeats)
+            output.writerow(row)
+
+
+def run_command(cmd):
+    return subprocess.check_call(cmd['cmd'], shell=True, cwd=cmd['cwd'])
 
 
 def main():
