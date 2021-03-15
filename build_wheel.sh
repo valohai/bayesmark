@@ -1,7 +1,7 @@
 #!/bin/bash
 
-set -ex
-set -o pipefail
+# set -ex
+# set -o pipefail
 
 # Display what version is being used for logging
 python --version
