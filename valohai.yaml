@@ -1,0 +1,34 @@
+- step:
+    name: benchmark
+    image: valohai/amd-benchmark:20210316-57e7a75
+    command:
+      - DB_ROOT=./dbroot && mkdir $DB_ROOT
+      - while true; do mpstat -P ALL {parameter-value:cpu_load_interval} >> /valohai/outputs/uptime.log; sleep {parameter-value:cpu_load_interval}; done &
+      - bayesmark-launch {parameter:iterations} {parameter:repeats} {parameter:optimizer} -dir $DB_ROOT -b run1 -v
+      - cp output.csv /valohai/outputs/output.csv
+    parameters:
+      - name: cpu_load_interval
+        type: integer
+        description: Interval to log out CPU usage
+        default: 10
+      - name: iterations
+        type: integer
+        pass-as: -n={v}
+        description: How many iterations the optimizer gets per study
+        default: 1
+      - name: repeats
+        type: integer
+        pass-as: -r={v}
+        description: How many studies are performed in total per model/dataset pair
+        default: 10
+      - name: repeats
+        type: integer
+        pass-as: -r={v}
+        description: How many studies are performed in total per model/dataset pair
+        default: 10
+      - name: optimizer
+        type: string
+        pass-as: -o={v}
+        description: Optimizer used
+        default: PySOT
+
