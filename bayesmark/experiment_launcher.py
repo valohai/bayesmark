@@ -13,6 +13,7 @@
 # limitations under the License.
 """Launch studies in separate studies or do dry run to build jobs file with lists of commands to run.
 """
+import csv
 import json
 import logging
 import random as pyrandom
@@ -33,6 +34,7 @@ from bayesmark.np_util import random_seed, strat_split
 from bayesmark.path_util import absopen
 from bayesmark.serialize import XRSerializer
 from bayesmark.util import range_str, shell_join, str_join_safe, strict_sorted
+from timeit import default_timer as timer
 
 # How much of uuid to put in job name to avoid name clashes
 UUID_JOB_CHARS = 7
@@ -143,7 +145,7 @@ def gen_commands(args, opt_file_lookup, run_uuid):
             assert all((_is_arg_safe(ss) == (ii % 2 == 1)) for ii, ss in enumerate(cmd_args))
 
             full_cmd = experiment_cmd + cmd_args
-            yield iteration_key, full_cmd
+            yield iteration_key, full_cmd, classifier, data
 
 
 def dry_run(args, opt_file_lookup, run_uuid, fp, random=np_random):
@@ -224,17 +226,56 @@ def real_run(args, opt_file_lookup, run_uuid, timeout=None):  # pragma: io
 
     # Get and run the commands in a sub-process
     counter = 0
+    models = {}
     G = gen_commands(args, opt_file_lookup, run_uuid)
-    for _, full_cmd in G:
-        try:
-            status = call(full_cmd, shell=False, cwd=args[CmdArgs.optimizer_root], timeout=timeout)
-            if status != 0:
-                raise ChildProcessError("status code %d returned from:\n%s" % (status, " ".join(full_cmd)))
-        except TimeoutExpired:
-            logger.info(f"Experiment timeout after {timeout} seconds.")
-            print(json.dumps({"experiment_timeout_exception": " ".join(full_cmd)}))
+    for _, full_cmd, model, dataset in G:
+        if model not in models:
+            models[model] = {}
+        if dataset not in models[model]:
+            models[model][dataset] = {"commands": []}
 
+        models[model][dataset]['commands'].append({"cmd": full_cmd, "model": model, "dataset": dataset, "cwd": args[CmdArgs.optimizer_root]})
+
+    for model, datasets in models.items():
+        for dataset, value in datasets.items():
+            commands = value['commands']
+            start = timer()
+            for cmd in commands:
+                try:
+                    status = call(cmd['cmd'], shell=False, cwd=cmd['cwd'], timeout=timeout)
+                    if status != 0:
+                        raise ChildProcessError("status code %d returned from:\n%s" % (status, " ".join(cmd['cmd'])))
+                except TimeoutExpired:
+                    logger.info(f"Experiment timeout after {timeout} seconds.")
+                    print(json.dumps({"experiment_timeout_exception": " ".join(cmd['cmd'])}))
+            end = timer()
+            duration = end - start
+            repeats = len(commands)
+            print({
+                "model": model,
+                "dataset": dataset,
+                "repeats": repeats,
+                "time": duration / repeats,
+            })
+            value['duration'] = duration
         counter += 1
+
+    with open('output.csv', 'w', newline='') as csvfile:
+        output = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        row = ['model']
+        for model, datasets in models.items():
+            for dataset, value in datasets.items():
+                if dataset not in row:
+                    row.append(dataset)
+        output.writerow(row)
+        for model, datasets in models.items():
+            row = [model]
+            for dataset, value in datasets.items():
+                repeats = len(value['commands'])
+                duration = value['duration']
+                row.append(duration/repeats)
+            output.writerow(row)
+
     logger.info(f"Benchmark script ran {counter} studies successfully.")
 
 
